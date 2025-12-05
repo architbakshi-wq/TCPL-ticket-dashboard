@@ -142,13 +142,24 @@ if status_sel:
 if shifts:
     filtered = filtered[filtered["Shift Timing"].isin(shifts)]
 
-if start_date is not None:
-    if end_date is None:
-        end_date = start_date
-    filtered = filtered[
-        (filtered["Created Time"] >= start_date) &
-        (filtered["Created Time"] <= end_date)
-    ]
+  # --- Robust date filtering (replace existing date filter) ---
+if start_date is not None and 'Created Time' in filtered.columns:
+    try:
+        # Ensure start_date and end_date are single pandas Timestamps (scalars)
+        sd = pd.to_datetime(start_date)
+        ed = pd.to_datetime(end_date) if end_date is not None else sd
+
+        # If either conversion produced PeriodIndex/array, take first element
+        if hasattr(sd, "__len__") and not isinstance(sd, pd.Timestamp):
+            sd = pd.to_datetime(sd[0])
+        if hasattr(ed, "__len__") and not isinstance(ed, pd.Timestamp):
+            ed = pd.to_datetime(ed[0])
+
+        # Use between() which is safe and clear
+        filtered = filtered[filtered['Created Time'].between(sd, ed)]
+    except Exception as e:
+        st.error(f"Date filter failed, skipping date filter: {e}")
+
 
 # ------------------- KPIs --------------------------------------------------
 total = len(filtered)
